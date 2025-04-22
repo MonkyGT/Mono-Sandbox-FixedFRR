@@ -8,12 +8,10 @@ using System.ComponentModel;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.UI;
-using Utilla;
 
 namespace MonoSandbox
 {
-    [ModdedGamemode, Description("HauntedModMenu")]
-    [BepInDependency("org.legoandmars.gorillatag.utilla", "1.5.0")]
+    [Description("HauntedModMenu")]
     [BepInPlugin(PluginInfo.GUID, PluginInfo.Name, PluginInfo.Version)]
     public class Plugin : BaseUnityPlugin
     {
@@ -105,15 +103,21 @@ namespace MonoSandbox
 
         public Plugin()
         {
-            Events.GameInitialized += OnGameInitialized;
+            GorillaTagger.OnPlayerSpawned(OnGameInitialized);
             new Harmony(PluginInfo.GUID).PatchAll(typeof(Plugin).Assembly);
         }
 
-        public void OnGameInitialized(object sender, EventArgs e)
+        public void OnGameInitialized()
         {
+            RefCache.LHand = GorillaTagger.Instance.offlineVRRig.leftHandTransform.parent.Find("palm.01.L").gameObject;
+            RefCache.RHand = GorillaTagger.Instance.offlineVRRig.rightHandTransform.parent.Find("palm.01.R").gameObject;
+
+            NetworkSystem.Instance.OnJoinedRoomEvent += OnJoin;
+            NetworkSystem.Instance.OnReturnedToSinglePlayer += OnLeave;
+            
             gameObject.AddComponent<InputHandling>();
 
-            _layerMask = Player.Instance.locomotionEnabledLayers;
+            _layerMask = GTPlayer.Instance.locomotionEnabledLayers;
             _layerMask |= 1 << 8;
 
             _itemsContainer = Instantiate(new GameObject());
@@ -242,20 +246,21 @@ namespace MonoSandbox
             }
 
         }
-
-        [ModdedGamemodeJoin]
-        public void OnJoin(string gamemode)
+        
+        public void OnJoin()
         {
-            InRoom = true;
-
-            foreach (Transform child in _itemsContainer.transform)
+            if (NetworkSystem.Instance.GameModeString.Contains("MODDED_"))
             {
-                child.gameObject.SetActive(true);
+                InRoom = true;
+
+                foreach (Transform child in _itemsContainer.transform)
+                {
+                    child.gameObject.SetActive(true);
+                }
             }
         }
-
-        [ModdedGamemodeLeave]
-        public void OnLeave(string gamemode)
+        
+        public void OnLeave()
         {
             InRoom = false;
 
@@ -269,7 +274,7 @@ namespace MonoSandbox
 
         public void Update()
         {
-            if (Player.Instance != null) RefCache.HitExists = Physics.Raycast(Player.Instance.rightControllerTransform.position, Player.Instance.rightControllerTransform.forward, out RefCache.Hit, 2000, _layerMask);
+            if (GTPlayer.Instance != null) RefCache.HitExists = Physics.Raycast(GTPlayer.Instance.rightControllerTransform.position, GTPlayer.Instance.rightControllerTransform.forward, out RefCache.Hit, 2000, _layerMask);
 
             #region List
 
